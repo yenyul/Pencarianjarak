@@ -1,15 +1,22 @@
 package com.yenti.pencarianjarak;
 
+import android.Manifest;
 import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.widget.ProgressBar;
+import android.widget.Toast;
 
 import com.google.android.gms.maps.model.LatLng;
 import com.google.maps.DirectionsApi;
@@ -51,7 +58,11 @@ public class DirectionListActivity extends AppCompatActivity implements OnRecycl
     private RecyclerViewListDirectionAdapter listDirectionAdapter;
     private List<DirectionsRoute> directionsResult = new ArrayList<>();
     private String encodedPath = "";
-   // private dialog dialog;
+    private Wisata dataWisata;
+    private ProgressDialog dialog;
+
+    private AsyncTask<Void, Void, DirectionsResult> directionTask;
+    // private dialog dialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,9 +84,32 @@ public class DirectionListActivity extends AppCompatActivity implements OnRecycl
 
 
         if(getIntent().hasExtra("data")) {
-            Wisata data = getIntent().getParcelableExtra("data");
+            dataWisata = getIntent().getParcelableExtra("data");
             //new OtherTask( new LatLng(-1.621435, 105.7794438), new LatLng(Double.parseDouble(data.getLattitude()), Double.parseDouble(data.getLongtitude())), new WeakReference<>(this)).execute();
-            new OtherTask( new LatLng(-1.9846153, 106.129835), new LatLng(Double.parseDouble(data.getLattitude()), Double.parseDouble(data.getLongtitude())), new WeakReference<>(this)).execute();
+        }
+
+        dialog = new ProgressDialog(this);
+        dialog.setTitle("Loading");
+        dialog.setMessage("Please wait, getting your location...");
+        dialog.setCancelable(false);
+        dialog.show();
+
+        LocationManager locationManager = (LocationManager)
+                getSystemService(Context.LOCATION_SERVICE);
+
+        LocationListener locationListener = new MyLocationListener();
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }else {
+            locationManager.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER, 1000, 10, locationListener);
         }
     }
 
@@ -98,8 +132,8 @@ public class DirectionListActivity extends AppCompatActivity implements OnRecycl
     private static class OtherTask extends AsyncTask<Void, Void, DirectionsResult> {
         private LatLng startPoint;
         private LatLng endPoint;
-        private ProgressDialog dialog;
         private WeakReference<DirectionListActivity> appReference;
+        private AsyncTask<Void, Void, DirectionsResult> directionTask;
 
         OtherTask(LatLng startPoint, LatLng endPoint, WeakReference<DirectionListActivity> appReference) {
             this.startPoint = startPoint;
@@ -117,13 +151,10 @@ public class DirectionListActivity extends AppCompatActivity implements OnRecycl
         }
 
         @Override
-        protected void onPreExecute(){
+        protected void onPreExecute() {
             super.onPreExecute();
-            dialog = new ProgressDialog(appReference.get());
-            dialog.setTitle("Loading");
-            dialog.setMessage("Please wait...");
-            dialog.setCancelable(false);
-            dialog.show();
+            appReference.get().dialog.setMessage("Now we counting the distance...");
+
         }
 
         @Override
@@ -173,9 +204,6 @@ public class DirectionListActivity extends AppCompatActivity implements OnRecycl
             appReference.get().directionsResult.add(a);*/
 
 
-
-
-
             appReference.get().directionsResult.addAll(new ArrayList<>(Arrays.asList(directionsResult.routes)));
 
             for (int i = 0; i < appReference.get().directionsResult.size(); i++) {
@@ -186,17 +214,17 @@ public class DirectionListActivity extends AppCompatActivity implements OnRecycl
             appReference.get().listDirectionAdapter.notifyDataSetChanged();
 
 
-
             //JALURNYA DI TERIMA NAMANYA directionResult
             MutableDirectedWeightedGraph<LatLng, Double> graph = MutableDirectedWeightedGraph.create();
             // Let's get the shortest paths of all pairs.
             // Johnson's algorithm is a combination of Bellman Ford's and Dijkstra's algorithm.
 
-            if(directionsResult != null) {
+            if (directionsResult != null) {
 
                 //jalur di looping
-                for (DirectionsRoute route : directionsResult.routes) {
-                    String time = route.legs[0].durationInTraffic.humanReadable;
+                if (directionsResult.routes.length > 0) {
+                    for (DirectionsRoute route : directionsResult.routes) {
+                        String time = route.legs[0].durationInTraffic.humanReadable;
 /*
 
                     LatLng firstLegPoint = PolyUtil.decode(route.legs[0].steps[0].polyline.getEncodedPath()).get(0);
@@ -223,42 +251,69 @@ public class DirectionListActivity extends AppCompatActivity implements OnRecycl
 */
 
 
+                        List<LatLng> decodedPath = PolyUtil.decode(route.overviewPolyline.getEncodedPath());
+                        graph.insertVertex(startPoint);
+                        graph.addEdge(startPoint, decodedPath.get(0), Haversine.getInstance().getDistanceFromLatLonInKm(startPoint, decodedPath.get(0)));
 
-                    List<LatLng> decodedPath = PolyUtil.decode(route.overviewPolyline.getEncodedPath());
-                    graph.insertVertex(startPoint);
-                    graph.addEdge(startPoint, decodedPath.get(0), Haversine.getInstance().getDistanceFromLatLonInKm(startPoint, decodedPath.get(0)));
+                        for (int i = 0; i < decodedPath.size(); i++) {
 
-                    for(int i = 0; i < decodedPath.size(); i++){
+                            //TITIK NYA DISIMPAN
+                            graph.insertVertex(decodedPath.get(i));
 
-                        //TITIK NYA DISIMPAN
-                        graph.insertVertex(decodedPath.get(i));
+                            //Titik ditarik garis ke titik berikutnya kalo masih ada
+                            if (i + 1 != decodedPath.size())
+                                graph.addEdge(decodedPath.get(i), decodedPath.get(i + 1), Haversine.getInstance().getDistanceFromLatLonInKm(decodedPath.get(i), decodedPath.get(i + 1)));
+                        }
 
-                        //Titik ditarik garis ke titik berikutnya kalo masih ada
-                        if(i + 1 != decodedPath.size())
-                            graph.addEdge(decodedPath.get(i), decodedPath.get(i+1), Haversine.getInstance().getDistanceFromLatLonInKm(decodedPath.get(i), decodedPath.get(i+1)) );
+                        graph.insertVertex(endPoint);
+                        graph.addEdge(decodedPath.get(decodedPath.size() - 1), endPoint, Haversine.getInstance().getDistanceFromLatLonInKm(decodedPath.get(decodedPath.size() - 1), endPoint));
+
+
                     }
+                    //ctrl+B
+                    AllPairShortestPath johnson = GoodJohnsonAlgorithm.getInstance();
+                    AllPairShortestPathResult<LatLng, Double, DirectedWeightedEdge<LatLng, Double>> res = johnson.calc(graph, DoubleNumberSystem.getInstance());
 
-                    graph.insertVertex(endPoint);
-                    graph.addEdge(decodedPath.get(decodedPath.size() - 1), endPoint, Haversine.getInstance().getDistanceFromLatLonInKm(decodedPath.get(decodedPath.size() - 1), endPoint));
-
-
-
+                    //double distanceAToB = res.getDistance(startPoint, endPoint); // must be 15
+                    List<LatLng> decodedPath = new ArrayList<>();
+                    for (DirectedWeightedEdge<LatLng, Double> tes : res.getPath(startPoint, endPoint)) {
+                        decodedPath.add(tes.from());
+                    }
+                    appReference.get().encodedPath = PolyUtil.encode(decodedPath);
                 }
-                //ctrl+B
-                AllPairShortestPath johnson = GoodJohnsonAlgorithm.getInstance();
-                AllPairShortestPathResult<LatLng, Double, DirectedWeightedEdge<LatLng, Double>> res = johnson.calc(graph, DoubleNumberSystem.getInstance());
-
-                double distanceAToB = res.getDistance(startPoint, endPoint); // must be 15
-                List<LatLng> decodedPath = new ArrayList<>();
-                for(DirectedWeightedEdge<LatLng, Double> tes : res.getPath(startPoint, endPoint)){
-                    decodedPath.add(tes.from());
-                }
-                appReference.get().encodedPath = PolyUtil.encode(decodedPath);
+                super.onPostExecute(directionsResult);
+                appReference.get().dialog.dismiss();
             }
-            super.onPostExecute(directionsResult);
-            dialog.dismiss();
+
         }
 
+
+    }
+
+
+    private class MyLocationListener implements LocationListener {
+
+        @Override
+        public void onLocationChanged(Location loc) {
+            Toast.makeText(getBaseContext(),
+                    "Location changed: Lat: " + loc.getLatitude() + " Lng: "
+                            + loc.getLongitude(), Toast.LENGTH_SHORT).show();
+            String longitude = "Longitude: " + loc.getLongitude();
+            String latitude = "Latitude: " + loc.getLatitude();
+            if(directionTask == null) {
+                directionTask = new OtherTask(new LatLng(loc.getLatitude(), loc.getLongitude()), new LatLng(Double.parseDouble(dataWisata.getLattitude()), Double.parseDouble(dataWisata.getLongtitude())), new WeakReference<>(DirectionListActivity.this));
+                directionTask.execute();
+            }
+        }
+
+        @Override
+        public void onProviderDisabled(String provider) {}
+
+        @Override
+        public void onProviderEnabled(String provider) {}
+
+        @Override
+        public void onStatusChanged(String provider, int status, Bundle extras) {}
     }
 
 }
