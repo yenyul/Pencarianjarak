@@ -9,7 +9,7 @@ public class Config {
     //public static final String URL_JABATAN = "http://10.100.135.144/skripsi/login1.php";
     public static final String Base_URL = "http://bangkatourism.000webhostapp.com";
     public static final String URL_AddWisata = Base_URL + "/kontribusi.php";
-    public static final String URL_Cate = Base_URL + "/getCategory.php";
+    public static final String URL_Cat = Base_URL + "/getCategory.php";
     public static final String URL_Wisata =  Base_URL + "/getWisata.php";
     public static final String URL_Kab =  Base_URL + "/getKabupaten1.php";
     public static final String URL_Detail = Base_URL +"/getDetailWisata.php";

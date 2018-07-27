@@ -41,7 +41,7 @@ public class CategoryActivity extends AppCompatActivity {
         protected String doInBackground(String... params) {
 
             RequestHandler rh = new RequestHandler();
-            String s = rh.sendGetRequest(Config.URL_Cate);
+            String s = rh.sendGetRequest(Config.URL_Cat);
             return s;
 
            // return new ConnectorHelper().get("https://bangkatourism.000webhostapp.com/getCategory.php");

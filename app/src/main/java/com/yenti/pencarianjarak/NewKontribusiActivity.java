@@ -14,8 +14,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.CompoundButton;
@@ -49,6 +47,7 @@ import java.util.Locale;
 
 public class NewKontribusiActivity extends AppCompatActivity {
     private ArrayList<String> dataKabupaten = new ArrayList<>();
+    private ArrayList<String> dataKategori = new ArrayList<>();
 
     private MapView mMapView;
     private GoogleMap mMap;
@@ -59,26 +58,27 @@ public class NewKontribusiActivity extends AppCompatActivity {
     private EditText no_telp;
     private EditText keterangan;
     private Button Save;
-    SpinnerKabuAdapter spinnerkabuAdapter;
+    SpinnerAdapter spinnerkabuAdapter;
+    SpinnerAdapter spinnerKategoriAdapter;
 
-  //  Spinner Category;
-    //Spinner Kabupaten;
+    Spinner spinnerKategori;
+    Spinner spinnerKabupaten;
 
-    class SpinnerKabuAdapter extends BaseAdapter {
-        List<String> kabupatenList;
+    class SpinnerAdapter extends BaseAdapter {
+        List<String> listData;
 
-        SpinnerKabuAdapter(ArrayList<String> kabupatenList){
-            this.kabupatenList = kabupatenList ;
+        SpinnerAdapter(ArrayList<String> listData){
+            this.listData = listData;
         }
 
         @Override
         public int getCount() {
-            return kabupatenList.size();
+            return listData.size();
         }
 
         @Override
         public Object getItem(int position) {
-            return kabupatenList.get(position);
+            return listData.get(position);
         }
 
         @Override
@@ -89,21 +89,21 @@ public class NewKontribusiActivity extends AppCompatActivity {
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             if(convertView == null){
-                convertView = getLayoutInflater().inflate(android.R.layout.simple_spinner_item, parent);
+                convertView = getLayoutInflater().inflate(android.R.layout.simple_spinner_item, null);
             }
 
             TextView text = (TextView) convertView.findViewById(android.R.id.text1);
-            text.setText(kabupatenList.get(position));
+            text.setText(listData.get(position));
 
             return convertView;
         }
     }
 
 
-    class getKabu extends AsyncTask<String, Void, String> {
+    class getKabupaten extends AsyncTask<String, Void, String> {
         private Context contexts;
 
-        public getKabu(Context contexts) {
+        public getKabupaten(Context contexts) {
             this.contexts = contexts;
         }
 
@@ -116,7 +116,6 @@ public class NewKontribusiActivity extends AppCompatActivity {
 
         protected void onPostExecute(String result) {
             String jsonStr = result;
-            //Toast.makeText(context, jsonStr, Toast.LENGTH_SHORT).show();
             if (jsonStr != null) {
                 try {
                     JSONObject object = new JSONObject(jsonStr);
@@ -131,6 +130,52 @@ public class NewKontribusiActivity extends AppCompatActivity {
                     }
                     if (spinnerkabuAdapter != null) {
                         spinnerkabuAdapter.notifyDataSetChanged();
+                        spinnerKabupaten.setClickable(true);
+                    }
+
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    Toast.makeText(contexts, "Error Parsing JSON Data", Toast.LENGTH_SHORT).show();
+                    Log.e("JSON Parser", "Error Parsing Data[" + e.getMessage() + "] " + jsonStr);
+                }
+
+            } else {
+                Toast.makeText(contexts, "Couldn't get JSON data", Toast.LENGTH_SHORT).show();
+            }
+
+        }
+    }
+
+    class getKategori extends AsyncTask<String, Void, String> {
+        private Context contexts;
+
+        public getKategori(Context contexts) {
+            this.contexts = contexts;
+        }
+
+        @Override
+        protected String doInBackground(String... strings) {
+            RequestHandler rh = new RequestHandler();
+            String s = rh.sendGetRequest(Config.URL_Cat);
+            return s;
+        }
+
+        protected void onPostExecute(String result) {
+            String jsonStr = result;
+            if (jsonStr != null) {
+                try {
+                    JSONObject object = new JSONObject(jsonStr);
+
+                    JSONArray a = object.getJSONArray("server_response");
+
+
+                    a.length();
+                    for (int i = 0; i < a.length(); i++) {
+                        dataKategori.add(a.getJSONObject(i).getString("nama_category"));
+                    }
+                    if (spinnerKategoriAdapter != null) {
+                        spinnerKategoriAdapter.notifyDataSetChanged();
+                        spinnerKategori.setClickable(true);
                     }
 
                 } catch (JSONException e) {
@@ -159,35 +204,16 @@ public class NewKontribusiActivity extends AppCompatActivity {
         nama_wisata = (EditText) findViewById(R.id.editTextNama);
         no_telp = (EditText) findViewById(R.id.editTextTelp);
         keterangan = (EditText) findViewById(R.id.editTextKeterangan);
-        spinnerkabuAdapter = new SpinnerKabuAdapter(this.dataKabupaten);
-        Spinner spinner = (Spinner) findViewById(R.id.spinnerkabu);
-        if (spinner != null) {
-            // Creating adapter for spinner
-            ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<String>(this,
-                    android.R.layout.simple_spinner_item, dataKabupaten);
 
-            // Drop down layout style - list view with radio button
-            spinnerAdapter
-                    .setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        dataKabupaten.add("-");
+        dataKategori.add("-");
+        spinnerkabuAdapter = new SpinnerAdapter(this.dataKabupaten);
+        spinnerKabupaten = (Spinner) findViewById(R.id.spinnerkabu);
+        spinnerKabupaten.setAdapter(spinnerkabuAdapter);
 
-            // attaching data adapter to spinner
-            spinner.setAdapter(spinnerAdapter);
-            //spinner.setAdapter(new SpinnerKabuAdapter(dataKabupaten));
-            spinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-                @Override
-                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
-                     //new WisataActivity.getWisata(WisataActivity.this, wisata_id, String.valueOf(position)).execute();
-                    //new getKabu(dataKabupaten, String.valueOf(position)).execute();
-                    //new getKabu(data) = (String) parent.getItemAtPosition(position);
-                }
-
-                @Override
-                public void onNothingSelected(AdapterView<?> parent) {
-
-                }
-
-            });
-        }
+        spinnerKategoriAdapter = new SpinnerAdapter(this.dataKategori);
+        spinnerKategori = (Spinner) findViewById(R.id.spinnercate);
+        spinnerKategori.setAdapter(spinnerKategoriAdapter);
 
         Save = (Button) findViewById(R.id.buttonSimpan);
 
@@ -213,7 +239,8 @@ public class NewKontribusiActivity extends AppCompatActivity {
                 mMapView.setVisibility(b ? View.VISIBLE : View.GONE);
             }
         });
-        new getKabu(this).execute();
+        new getKabupaten(this).execute();
+        new getKategori(this).execute();
     }
 
 
