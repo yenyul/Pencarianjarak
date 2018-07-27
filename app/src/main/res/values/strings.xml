@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Pencarian </string>
+    <string name="title_activity_test">Test</string>
+    <string name="textreghere">Register Here!<u>underline</u>.</string>
+    <string name="title_activity_maps">Map</string>
+
+</resources>
